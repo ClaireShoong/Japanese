@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8" />
-  <title>관광 일본어 학습기 (완전 초거대판)</title>
+  <title>관광 일본어 학습기 + 퀴즈 (완전 초거대판)</title>
   <style>
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -14,11 +14,18 @@
       font-size: 1.8rem;
       margin-bottom: 0.5rem;
     }
+    h2 {
+      margin-top: 2rem;
+      font-size: 1.4rem;
+    }
     select {
       width: 100%;
       padding: 8px;
       margin: 6px 0;
       font-size: 1rem;
+    }
+    button {
+      cursor: pointer;
     }
     .card {
       background: #f5f5f5;
@@ -41,16 +48,49 @@
       font-size: 0.95rem;
       color: #555;
     }
+
+    /* 퀴즈용 스타일 */
+    .quiz-card {
+      background: #eef4ff;
+      border-radius: 10px;
+      padding: 16px;
+      margin-top: 12px;
+    }
+    #quiz-question {
+      font-size: 1.2rem;
+      font-weight: 700;
+      margin: 12px 0;
+    }
+    .option-btn {
+      display: block;
+      width: 100%;
+      margin: 4px 0;
+      padding: 8px;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+      background: #fff;
+      text-align: left;
+      font-size: 0.95rem;
+    }
+    #quiz-feedback {
+      margin-top: 10px;
+      font-weight: 600;
+    }
   </style>
 </head>
 <body>
-  <h1>관광 일본어 학습기 (완전 초거대판)</h1>
-  <p>카테고리와 보기 방식을 선택하면 <strong>단어 또는 예시문</strong>이 표시됩니다.</p>
+  <h1>관광 일본어 학습기 (보기 + 퀴즈)</h1>
+  <p>
+    위쪽에서는 <strong>카테고리별 단어/예문</strong>을 보고,  
+    아래쪽에서는 <strong>단어 뜻 맞추기 퀴즈</strong>를 할 수 있습니다.<br />
+    You can study words/sentences above, and use the quiz mode below.
+  </p>
 
-  <label for="category">카테고리 선택:</label>
+  <!-- ===== 메인 학습 영역 ===== -->
+  <label for="category">카테고리 선택 (Category):</label>
   <select id="category">
-    <option value="">-- 선택하세요 --</option>
-    <option value="greetings">기본 인사 · 표현</option>
+    <option value="">-- 선택하세요 / Choose --</option>
+    <option value="greetings">기본 인사 · 표현 (Greetings)</option>
     <option value="train">교통수단 (기차 · 비행기 · 지하철)</option>
     <option value="hotel">숙소 · 온천</option>
     <option value="food">식사 · 음식 (메뉴판 재료/동물 포함)</option>
@@ -60,17 +100,35 @@
     <option value="timeMoney">시간 · 숫자 · 금액</option>
   </select>
 
-  <label for="mode">보기 방식:</label>
+  <label for="mode">보기 방식 (View mode):</label>
   <select id="mode">
-    <option value="vocab">단어 먼저 보기 (Vocab)</option>
+    <option value="vocab">단어 먼저 보기 (Vocabulary)</option>
     <option value="sentences">예시문 보기 (Sentences)</option>
   </select>
 
   <div id="output" class="card"></div>
 
+  <!-- ===== 퀴즈 영역 ===== -->
+  <h2>퀴즈 모드 (Quiz Mode)</h2>
+  <p>
+    <strong>일본어 → 한국어 뜻</strong> 객관식 퀴즈입니다.  
+    This quiz asks: “What is the Korean meaning of this Japanese word?”
+  </p>
+  <button id="toggle-quiz">퀴즈 열기 / 닫기 (Toggle Quiz)</button>
+
+  <div id="quiz-container" class="quiz-card" style="display:none;">
+    <button id="new-question-btn">새 문제 (New Question)</button>
+    <div id="quiz-question">버튼을 눌러 퀴즈를 시작하세요.<br />Press the button to start.</div>
+    <div id="quiz-options"></div>
+    <div id="quiz-feedback"></div>
+  </div>
+
 <script>
+/* ===========================
+   1. 기존 데이터 (data 객체)
+   =========================== */
 const data = {
-  /* 1. 기본 인사 · 표현 (기존 + 유지) */
+  /* 1. 기본 인사 · 표현 */
   greetings: {
     vocab: [
       { jp: "こんにちは", read: "こんにちは", rom: "콘니치와", kr: "안녕하세요 (낮 인사)" },
@@ -109,7 +167,7 @@ const data = {
     ]
   },
 
-  /* 2. 교통수단 (기존 풍부 버전) */
+  /* 2. 교통수단 */
   train: {
     vocab: [
       { jp: "駅（えき）", read: "えき", rom: "에키", kr: "역" },
@@ -148,7 +206,7 @@ const data = {
     ]
   },
 
-  /* 3. 숙소 · 온천 (기존 + 유지) */
+  /* 3. 숙소 · 온천 */
   hotel: {
     vocab: [
       { jp: "予約（よやく）", read: "よやく", rom: "요야쿠", kr: "예약" },
@@ -187,10 +245,10 @@ const data = {
     ]
   },
 
-  /* 4. 식사 · 음식 (기존 + 재료 + 동물 + 메뉴판용 재료) */
-   food: {
+  /* 4. 식사 · 음식 (메뉴, 재료, 음료 풀 확장판) */
+  food: {
     vocab: [
-      /* === 기본 요리/메뉴 (메인 요리) === */
+      /* === 기본 요리/메뉴 === */
       { jp: "料理（りょうり）", read: "りょうり", rom: "료오리", kr: "요리" },
       { jp: "定食（ていしょく）", read: "ていしょく", rom: "테이쇼쿠", kr: "정식" },
       { jp: "刺身（さしみ）", read: "さしみ", rom: "사시미", kr: "생선회" },
@@ -213,7 +271,7 @@ const data = {
       { jp: "餃子（ぎょうざ）", read: "ぎょうざ", rom: "교오자", kr: "교자, 만두" },
       { jp: "焼き鳥（やきとり）", read: "やきとり", rom: "야키토리", kr: "닭꼬치, 야키토리" },
 
-      /* === 밥/면/국물 요리 === */
+      /* === 밥/국/전골 === */
       { jp: "ご飯（ごはん）", read: "ごはん", rom: "고한", kr: "밥" },
       { jp: "白ご飯（しろごはん）", read: "しろごはん", rom: "시로고한", kr: "흰밥" },
       { jp: "チャーハン", read: "チャーハン", rom: "챠아한", kr: "볶음밥" },
@@ -224,7 +282,7 @@ const data = {
       { jp: "しゃぶしゃぶ", read: "しゃぶしゃぶ", rom: "샤부샤부", kr: "샤부샤부" },
       { jp: "キムチ鍋（キムチなべ）", read: "キムチなべ", rom: "키무치 나베", kr: "김치나베" },
 
-      /* === 채소/버섯/콩류 (야채 재료) === */
+      /* === 채소/버섯/콩류 === */
       { jp: "野菜（やさい）", read: "やさい", rom: "야사이", kr: "야채" },
       { jp: "サラダ", read: "サラダ", rom: "사라다", kr: "샐러드" },
       { jp: "玉ねぎ（たまねぎ）", read: "たまねぎ", rom: "타마네기", kr: "양파" },
@@ -257,11 +315,10 @@ const data = {
       { jp: "豆腐（とうふ）", read: "とうふ", rom: "토오후", kr: "두부" },
       { jp: "冷奴（ひややっこ）", read: "ひややっこ", rom: "히야얏코", kr: "차가운 두부 요리" },
       { jp: "納豆（なっとう）", read: "なっとう", rom: "낫또오", kr: "낫토" },
-      { jp: "味噌（みそ）", read: "みそ", rom: "미소", kr: "된장" },
       { jp: "海苔（のり）", read: "のり", rom: "노리", kr: "김" },
       { jp: "わかめ", read: "わかめ", rom: "와카메", kr: "미역" },
 
-      /* === 고기/생선 재료 (메뉴판용) === */
+      /* === 고기/생선·해산물 === */
       { jp: "牛肉（ぎゅうにく）", read: "ぎゅうにく", rom: "규우니쿠", kr: "소고기" },
       { jp: "豚肉（ぶたにく）", read: "ぶたにく", rom: "부타니쿠", kr: "돼지고기" },
       { jp: "鶏肉（とりにく）", read: "とりにく", rom: "토리니쿠", kr: "닭고기" },
@@ -292,7 +349,7 @@ const data = {
       { jp: "バター", read: "バター", rom: "바타아", kr: "버터" },
       { jp: "ヨーグルト", read: "ヨーグルト", rom: "요오구루토", kr: "요거트" },
 
-      /* === 소스/양념/기본 재료 === */
+      /* === 양념/소스 === */
       { jp: "塩（しお）", read: "しお", rom: "시오", kr: "소금" },
       { jp: "胡椒（こしょう）", read: "こしょう", rom: "코쇼오", kr: "후추" },
       { jp: "醤油（しょうゆ）", read: "しょうゆ", rom: "쇼오유", kr: "간장" },
@@ -345,9 +402,11 @@ const data = {
       { jp: "プリン", read: "プリン", rom: "푸린", kr: "푸딩, 푸린" },
       { jp: "和菓子（わがし）", read: "わがし", rom: "와가시", kr: "일본식 과자, 화과자" },
       { jp: "もち", read: "もち", rom: "모치", kr: "떡, 모치" },
-      { jp: "団子（だんご）", read: "だんご", rom: "당고", kr: "당고, 경단" }
-    ],
+      { jp: "団子（だんご）", read: "だんご", rom: "당고", kr: "당고, 경단" },
 
+      /* === 계산 관련 === */
+      { jp: "会計（かいけい）", read: "かいけい", rom: "카이케이", kr: "계산" }
+    ],
     sentences: [
       {
         jp: "牛肉の定食を一つお願いします。",
@@ -400,7 +459,7 @@ const data = {
     ]
   },
 
-  /* 5. 쇼핑 (기존) */
+  /* 5. 쇼핑 */
   shopping: {
     vocab: [
       { jp: "いくら", read: "いくら", rom: "이쿠라", kr: "얼마" },
@@ -439,7 +498,7 @@ const data = {
     ]
   },
 
-  /* 6. 길 묻기 (기존) */
+  /* 6. 길 묻기 */
   directions: {
     vocab: [
       { jp: "道（みち）", read: "みち", rom: "미치", kr: "길" },
@@ -478,7 +537,7 @@ const data = {
     ]
   },
 
-  /* 7. 긴급상황 (기존) */
+  /* 7. 긴급상황 */
   emergency: {
     vocab: [
       { jp: "助けて（たすけて）", read: "たすけて", rom: "타스케테", kr: "도와 주세요" },
@@ -516,7 +575,7 @@ const data = {
     ]
   },
 
-  /* 8. 시간 · 숫자 · 금액 (1~12시 + 자주 쓰는 분/금액 20개 이상) */
+  /* 8. 시간 · 숫자 · 금액 */
   timeMoney: {
     vocab: [
       // 시각 1~12시
@@ -542,7 +601,7 @@ const data = {
       { jp: "三十分（さんじゅっぷん）", read: "さんじゅっぷん", rom: "산쥽푼", kr: "30분" },
       { jp: "四十五分（よんじゅうごふん）", read: "よんじゅうごふん", rom: "욘쥬고훈", kr: "45분" },
 
-      // 금액: 자주 쓰는 금액대 (기존 + 확장)
+      // 금액
       { jp: "百円（ひゃくえん）", read: "ひゃくえん", rom: "햐쿠엔", kr: "100엔" },
       { jp: "二百円（にひゃくえん）", read: "にひゃくえん", rom: "니햐쿠엔", kr: "200엔" },
       { jp: "三百円（さんびゃくえん）", read: "さんびゃくえん", rom: "산뱌쿠엔", kr: "300엔" },
@@ -635,14 +694,16 @@ const data = {
   }
 };
 
-/* 출력 함수 */
+/* ===========================
+   2. 메인 출력 함수
+   =========================== */
 function render() {
   const cat = document.getElementById("category").value;
   const mode = document.getElementById("mode").value;
   const out = document.getElementById("output");
 
   if (!cat) {
-    out.innerHTML = "<em>카테고리를 먼저 선택해 주세요.</em>";
+    out.innerHTML = "<em>카테고리를 먼저 선택해 주세요.<br>Choose a category first.</em>";
     return;
   }
 
@@ -650,7 +711,7 @@ function render() {
   let html = "";
 
   if (!section) {
-    out.innerHTML = "<em>해당 모드의 데이터가 없습니다.</em>";
+    out.innerHTML = "<em>해당 모드의 데이터가 없습니다.<br>No data for this mode.</em>";
     return;
   }
 
@@ -660,8 +721,8 @@ function render() {
       html += `
         <div class="item">
           <div class="jp-main">${item.jp}</div>
-          <div class="jp-sub">읽기: ${item.read} / 발음(한국어식): ${item.rom}</div>
-          <div class="kr">뜻: ${item.kr}</div>
+          <div class="jp-sub">읽기(히라가나): ${item.read} / 발음(한국어식): ${item.rom}</div>
+          <div class="kr">뜻(한국어): ${item.kr}</div>
         </div>
       `;
     });
@@ -671,9 +732,9 @@ function render() {
       html += `
         <div class="item">
           <div class="jp-main">${item.jp}</div>
-          <div class="jp-sub">읽기: ${item.read}</div>
+          <div class="jp-sub">읽기(히라가나): ${item.read}</div>
           <div class="jp-sub">발음(한국어식): ${item.rom}</div>
-          <div class="kr">뜻: ${item.kr}</div>
+          <div class="kr">뜻(한국어): ${item.kr}</div>
         </div>
       `;
     });
@@ -684,7 +745,118 @@ function render() {
 
 document.getElementById("category").addEventListener("change", render);
 document.getElementById("mode").addEventListener("change", render);
-document.getElementById("output").innerHTML = "<em>카테고리와 보기 방식을 선택하면 내용이 표시됩니다.</em>";
+document.getElementById("output").innerHTML =
+  "<em>카테고리와 보기 방식을 선택하면 내용이 표시됩니다.<br>Select a category and mode.</em>";
+
+/* ===========================
+   3. 퀴즈 기능 (전체 vocab 기반)
+   =========================== */
+
+// 3-1. data 안의 모든 카테고리에서 vocab만 모아서 quizPool 생성
+const quizPool = [];
+for (const [catName, catData] of Object.entries(data)) {
+  if (catData.vocab && Array.isArray(catData.vocab)) {
+    catData.vocab.forEach(item => {
+      if (item.jp && item.kr) {
+        quizPool.push({
+          jp: item.jp,
+          kr: item.kr,
+          category: catName
+        });
+      }
+    });
+  }
+}
+
+let currentAnswer = null;
+
+// 랜덤 인덱스
+function randInt(max) {
+  return Math.floor(Math.random() * max);
+}
+
+// 새 문제 생성
+function makeNewQuestion() {
+  const questionElem = document.getElementById("quiz-question");
+  const optionsElem = document.getElementById("quiz-options");
+  const feedbackElem = document.getElementById("quiz-feedback");
+
+  if (!questionElem || quizPool.length === 0) return;
+
+  feedbackElem.textContent = "";
+  feedbackElem.style.color = "#333";
+
+  // 1) 문제 단어 하나 뽑기
+  const idx = randInt(quizPool.length);
+  const q = quizPool[idx];
+  currentAnswer = q.kr;
+
+  questionElem.innerHTML =
+    `이 일본어 단어의 한국어 뜻은 무엇일까요?<br>` +
+    `<strong>${q.jp}</strong> (카테고리: ${q.category})`;
+
+  // 2) 정답 + 오답 후보 만들기
+  const wrongCandidates = quizPool
+    .map(x => x.kr)
+    .filter(kr => kr !== currentAnswer);
+
+  // 섞기
+  for (let i = wrongCandidates.length - 1; i > 0; i--) {
+    const j = randInt(i + 1);
+    [wrongCandidates[i], wrongCandidates[j]] = [wrongCandidates[j], wrongCandidates[i]];
+  }
+
+  const options = [currentAnswer, ...wrongCandidates.slice(0, 3)];
+
+  // 보기 순서 섞기
+  for (let i = options.length - 1; i > 0; i--) {
+    const j = randInt(i + 1);
+    [options[i], options[j]] = [options[j], options[i]];
+  }
+
+  // 3) 버튼 렌더링
+  optionsElem.innerHTML = "";
+  options.forEach(text => {
+    const btn = document.createElement("button");
+    btn.textContent = text;
+    btn.className = "option-btn";
+    btn.onclick = () => checkAnswer(text);
+    optionsElem.appendChild(btn);
+  });
+}
+
+// 정답 확인
+function checkAnswer(chosen) {
+  const feedbackElem = document.getElementById("quiz-feedback");
+  if (!feedbackElem) return;
+
+  if (chosen === currentAnswer) {
+    feedbackElem.textContent = "정답입니다! ✅   Correct!";
+    feedbackElem.style.color = "green";
+  } else {
+    feedbackElem.textContent = `틀렸습니다 ❌  정답: ${currentAnswer}`;
+    feedbackElem.style.color = "red";
+  }
+}
+
+// 퀴즈 열기/닫기 토글
+const quizContainer = document.getElementById("quiz-container");
+const toggleQuizBtn = document.getElementById("toggle-quiz");
+if (toggleQuizBtn && quizContainer) {
+  toggleQuizBtn.addEventListener("click", () => {
+    const visible = quizContainer.style.display !== "none";
+    quizContainer.style.display = visible ? "none" : "block";
+  });
+}
+
+// "새 문제" 버튼
+const newQuestionBtn = document.getElementById("new-question-btn");
+if (newQuestionBtn) {
+  newQuestionBtn.addEventListener("click", makeNewQuestion);
+}
 </script>
 </body>
 </html>
+
+      
+
